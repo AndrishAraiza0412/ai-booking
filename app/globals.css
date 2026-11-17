@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+/* The theme is set by the data-theme attribute of <html> (see layout.tsx and ThemeToggle). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --background: #0b0b0c;
+  --foreground: #f2f2f3;
+  --card: #111113;
+  --line: rgba(255, 255, 255, 0.09);
+  --muted: rgba(255, 255, 255, 0.5);
+  --ink: #fff; /* color de texto/acento; --paper es su contraste */
+  --paper: #000;
+  --ok: #34c77b;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --background: #f5f5f3;
+  --foreground: #111113;
+  --card: #fff;
+  --line: rgba(0, 0, 0, 0.1);
+  --muted: rgba(0, 0, 0, 0.5);
+  --ink: #111113;
+  --paper: #fff;
+  --ok: #16a05a;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Turno: tarjeta de reserva ---------- */
+.turno {
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  background: var(--card);
+  overflow: hidden;
+  animation: fade-up 0.6s var(--ease) both;
+}
+
+.turno-in {
+  width: 100%;
+  border-radius: 0.6rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  padding: 0.5rem 0.7rem;
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+.turno-in:focus { border-color: color-mix(in srgb, var(--ink) 35%, transparent); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.turno-in[aria-invalid="true"] { border-color: #ff6b6b; animation: shake 0.35s; }
+
+.turno-opt {
+  display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 0.5rem;
+  border-radius: 0.6rem; border: 1px solid transparent; padding: 0.5rem 0.7rem;
+  font-size: 0.8rem; text-align: left; color: var(--muted);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.turno-opt:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--foreground); }
+.turno-opt[aria-pressed="true"] { background: color-mix(in srgb, var(--ink) 8%, transparent); border-color: var(--line); color: var(--foreground); }
+
+/* Calendar: the white disc travels between days; the digits are inverted with mix-blend-mode. */
+/* The opaque background is part of the isolated group: without it, the "difference" blend has nothing to invert against and the white digits disappear in light mode. */
+.turno-cal { position: relative; isolation: isolate; display: grid; grid-template-columns: repeat(7, 1fr); background: var(--card); }
+.turno-disc {
+  position: absolute; top: 0; left: 0; z-index: 0; width: calc(100% / 7); aspect-ratio: 1;
+  padding: 0.3rem; pointer-events: none;
+  transition: transform 0.5s var(--ease);
+}
+.turno-disc::after {
+  content: ""; display: block; width: 100%; height: 100%; border-radius: 50%; background: var(--ink);
+  animation: pop 0.35s var(--ease) both;
+}
+.turno-dia {
+  position: relative; z-index: 1; aspect-ratio: 1; display: grid; place-items: center; align-content: center;
+  color: #fff; mix-blend-mode: difference; font-size: 0.8rem; font-variant-numeric: tabular-nums;
+  opacity: 0.22; transition: opacity 0.3s;
+}
+.turno-dia i { position: absolute; bottom: 22%; width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+.turno-dia[data-free="true"] { opacity: 1; cursor: pointer; }
+.turno-dia[data-free="true"]:hover:not([aria-pressed="true"]) { opacity: 0.7; }
+.turno-dia[data-today="true"]::before {
+  content: ""; position: absolute; inset: 0.3rem; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--ink) 40%, transparent);
+}
+.turno-dia:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; border-radius: 50%; }
+.turno-cal[data-loading="true"] .turno-dia { opacity: 0.12; }
+
+/* Cascading hours; the chosen one splits into time + Confirm. */
+.turno-fila {
+  display: grid; grid-template-columns: 1fr 0fr; gap: 0;
+  transition: grid-template-columns 0.35s var(--ease), gap 0.35s var(--ease);
+  animation: slot-in 0.5s var(--ease) both; animation-delay: calc(var(--i) * 35ms);
+}
+.turno-fila[data-on="true"] { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.turno-hora, .turno-confirmar {
+  min-width: 0; overflow: hidden; white-space: nowrap; border-radius: 0.5rem; padding: 0.5rem 0;
+  font-size: 0.78rem; font-variant-numeric: tabular-nums; border: 1px solid var(--line);
+  transition: background 0.25s, color 0.25s, border-color 0.25s, opacity 0.25s;
+}
+.turno-hora:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.turno-fila[data-on="true"] .turno-hora { background: color-mix(in srgb, var(--ink) 12%, transparent); border-color: transparent; }
+.turno-confirmar { background: var(--ink); color: var(--paper); font-weight: 500; opacity: 0; pointer-events: none; border-width: 0; }
+.turno-fila[data-on="true"] .turno-confirmar { opacity: 1; pointer-events: auto; }
+.turno-confirmar:disabled { opacity: 0.6; }
+
+/* The strokes use pathLength="1" in the SVG, so 1 = full stroke. */
+.turno-ok svg circle { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 0.6s var(--ease) 0.1s forwards; }
+.turno-ok svg path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 0.4s var(--ease) 0.55s forwards; }
+
+@keyframes slot-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px); } }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.94) translateY(6px); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.4); } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Theme switch: sun in dark mode, moon in light mode. */
+:root[data-theme="dark"] .theme-moon, :root[data-theme="light"] .theme-sun { display: none; }
+
+/* ---------- Panel del negocio: botones, campos, paneles ---------- */
+@layer components {
+  .panel { border: 1px solid var(--line); border-radius: 1rem; background: var(--card); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; cursor: pointer;
+    border-radius: 0.6rem; border: 1px solid transparent; padding: 0.5rem 0.9rem;
+    background: var(--ink); color: var(--paper); font-size: 0.8rem; font-weight: 500; line-height: 1.2; white-space: nowrap;
+    transition: opacity 0.2s, transform 0.15s var(--ease), background 0.2s, border-color 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; pointer-events: none; }
+  .btn:focus-visible, .field:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.75rem; }
+  .btn-ghost { background: transparent; color: var(--foreground); border-color: var(--line); }
+  .btn-ghost:hover { opacity: 1; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .btn-danger { background: transparent; color: #e5484d; border-color: color-mix(in srgb, #e5484d 35%, transparent); }
+  .btn-danger:hover { opacity: 1; background: color-mix(in srgb, #e5484d 12%, transparent); }
+  .btn-destructive { background: #e5484d; color: #fff; }
+
+  .confirm {
+    margin: auto; width: min(22rem, calc(100vw - 2rem)); padding: 1.25rem; color: var(--foreground);
+    background: var(--card); border: 1px solid var(--line); border-radius: 1rem;
+    box-shadow: 0 24px 60px rgb(0 0 0 / 0.35);
+  }
+  .confirm[open] { animation: pop-in 0.25s var(--ease); }
+  .confirm::backdrop { background: rgb(0 0 0 / 0.55); backdrop-filter: blur(3px); animation: fade 0.25s; }
+
+  .field {
+    border-radius: 0.6rem; border: 1px solid var(--line); background: color-mix(in srgb, var(--ink) 4%, transparent);
+    padding: 0.45rem 0.65rem; font-size: 0.8rem; outline: none; transition: border-color 0.2s, background 0.2s;
+  }
+  .field:focus { border-color: color-mix(in srgb, var(--ink) 35%, transparent); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .label { display: grid; gap: 0.3rem; font-size: 0.7rem; color: var(--muted); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.3rem; border-radius: 999px; border: 1px solid var(--line);
+    padding: 0.1rem 0.55rem; font-size: 0.68rem; color: var(--muted);
+  }
+  .badge-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+
+  .tabla { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.8rem; }
+  .tabla th { padding: 0.6rem 1rem; font-size: 0.68rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .tabla td { padding: 0.75rem 1rem; border-top: 1px solid var(--line); vertical-align: middle; }
+  .tabla tbody tr { transition: background 0.2s; }
+  .tabla tbody tr:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+  .avatar {
+    display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border-radius: 50%;
+    background: color-mix(in srgb, var(--ink) 10%, transparent); font-size: 0.72rem; font-weight: 600;
+  }
+}
